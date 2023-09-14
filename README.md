@@ -2,7 +2,7 @@
 
 ## Overview
 
-PeLaTun is a notebook designed for the peristaltic tuning of the last transformer block and unembedding layers of the Llama2-7B language model.
+PeLaTun is a notebook designed for the peristaltic tuning of the last transformer block(s) and unembedding layer of the Llama2-7B language model.
 This process is conducted with a context length of 4096 tokens and utilizes 16-bit precision, while using under 8GB VRAM.
 
 ### Intuition
@@ -47,7 +47,6 @@ Despite optimizations, such as excluding activations to be padded or storing onl
 
 ## Advantages
 
-The primary advantage of PeLaTun is its ability to make some for of fine-tuning large language models feasible on hardware with very limited resources. 
-It eliminates the need for extensive resources typically required for fine-tuning, effectively freezing earlier layers. 
-Moreover, preprocessing the dataset as PeLaTun does speeds up the final layer finetuning phase, as activations are only passed through the last layer, rather than all preceding layers.
+The primary advantage of PeLaTun is its ability to make the fine-tuning large language models (at least last layer finetuning) feasible on hardware with very limited resources. 
+Preprocessing the dataset as PeLaTun does also speeds up the final layer finetuning phase, as activations are only passed through the last layer, rather than all preceding layers.
 This results in faster iterations if doing multiple training runs after the initial dataset peristalsis.
