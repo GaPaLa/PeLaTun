@@ -42,7 +42,7 @@ Writing to disk is significantly slower than processing through a transformer bl
 Otherwise, you risk overloading VRAM/RAM, leading to system crashes.
 As a result, dataset peristalsis is a time-consuming process.
 
-Additionally, PeLaTun consumes a substantial amount of storage space due to the need to store activations. For instance, processing 300 samples, each with approximately 1000 tokens, with an embeddings size of 4096 can take up over 1TB of storage.
+Additionally, PeLaTun consumes a substantial amount of storage space due to the need to store activations. For instance, processing 300 samples, each with approximately 1000 tokens, with an embeddings size of 4096 takes up ~3GB.
 Despite optimizations, such as excluding activations to be padded or storing only the most recent layer's activations, significant storage space is still required.
 
 ## Advantages
