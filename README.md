@@ -2,18 +2,22 @@
 
 ## Overview
 
-PeLaTun is a notebook designed for the peristaltic tuning of the last transformer block(s) and unembedding layer of the Llama2-7B language model.
-This process is conducted with a context length of 4096 tokens and utilizes 16-bit precision, while using under 8GB VRAM.
+If you are memory-poor, you may consider last layer(s) finetuning,
+but you may not be able to even fit the entire model in VRAM, let alone for inference or training.
 
-### Intuition
+PeLaTun (Peristaltic Last Layer fineTuning) is a notebook designed for finetuning the last transformer block and unembedding layer of the Llama2-7B language model,
+with a context length of 4096 tokens and 16-bit precision, while using under 8GB VRAM.
 
-I use the term "peristaltic", as we are passing the entire dataset progressively through the model, one transformer block at a time.
-This approach contrasts with the conventional practice of processing small sections of the dataset through all layers simultaneously.
-The trade-off involves reduced VRAM requirements in exchange for significantly slower overall training time (the data proeprocessing step is very slow due to I/O, the actual finetuning of the last layer is fast) and higher storage demands.
 
-The core idea is that since it is known that you can achieve decent results by fine-tuning only the last few layers of a language model, including the lm_head, normalization layer, and the last transformer block,
-this allows for a reduction in VRAM requirements if we do this by pre-processing the dataset through the lower layers of the transformer, loading only one layer at a time.
-That results in a dataset comprising activations just before the final layers to be trained, along with the ground truth tokens for prediction, so just the last few layers can be trained with standard language modelling, just taking input activations instead of tokens.
+This notebook notices that:
+
+1) to train the last few layers, you only need the preceeding activations and final labels to form your x,y training dataset - to avoid loading the whole model, you can just load the preceeding layers and do inference to get these preceding activations
+2) to minimize the VRAM requirement further, you can do this inference with just one layer at a time
+3) If you are only loading one layer at a time, it is much faster to load one layer at a time and pass the dataset through it and repeat that for the next layer,
+   than to pass a single batch through the entire model while loading one layer at a time, and repeating that for every batch - the first options uses far too much disk I/O
+
+..and implements an appropriate training pipeline to preprocess the dataset and finetune the last layer in this fashion.
+
 
 ### Peristaltic Inference
 
@@ -25,28 +29,27 @@ With more VRAM, it's possible to load multiple layers at once and increase batch
 
 ### Fine-Tuning
 
-For the fine-tuning phase, you load the last few transformer layer(s) you wish to train, along with the precomputed activations and labels.
-The fine-tuning process then follows the standard language modelling procedure, with activations serving as inputs rather than tokens.
+For the fine-tuning phase, you load the last few transformer layer(s) you wish to train, along with the precomputed activations and labels. The last layers to be trained must be the ones directly after the pre-computed activations from earlier inference.
+The fine-tuning process then follows the standard language modelling procedure, but with activations serving as inputs rather than tokens.
 
 ## Future Work
 
-PeLaTun could be extended to further reduce VRAM requirements by integrating with QLoRa. The goal is to enable fine-tuning of the last few layers of a 70B language model on limited 8GB VRAM, potentially employing low-VRAM optimizers.
+PeLaTun could be extended to further reduce VRAM requirements by integrating QLoRa. The moonshot goal is to enable fine-tuning of the last few transformer blocks of a 70B language model with 8GB VRAM.
 
-Finding a way to extend this to finetuning the whole model by mixing in gradient checkpointing with selective layer loading seems possible but that prcess would take up double the disk space and require each layer to be both train and to have niference re-run on that layer.
-Since this is just a fun project to test an idea and practice a little, this is left out.
+Finding a way to extend this to finetuning the whole model by taking inspiration from gradient checkpointing seems possible, but that would take up even more disk space (for gradients) and require each layer to be both trained and to have inference re-run on that layer to get the relevant gradients.
+Since this is just a fun project to test an idea, this is left out.
 
 ## Issues
 
-The primary challenge of PeLaTun is related to I/O bandwidth and storage space. Peristaltic inference involves continuously writing and overwriting hidden states on disk.
-Writing to disk is significantly slower than processing through a transformer block, resulting in waiting times for write operations to complete before starting the next batch.
-Otherwise, you risk overloading VRAM/RAM, leading to system crashes.
-As a result, dataset peristalsis is a time-consuming process.
+The primary challenge of PeLaTun is related to I/O bandwidth and storage space. Peristaltic inference involves continuously (over)writing hidden states to disk.
+Writing activations to disk is significantly slower than passing it through a transformer block, resulting in waiting times for write operations to complete before starting the next batch (otherwise, you risk a vuffer overflow of cached activations).
+As a result, dataset peristalsis is a very time-consuming process.
 
-Additionally, PeLaTun consumes a substantial amount of storage space due to the need to store activations. For instance, processing 300 samples, each with approximately 1000 tokens, with an embeddings size of 4096 takes up ~3GB.
-Despite optimizations, such as excluding activations to be padded or storing only the most recent layer's activations, significant storage space is still required.
+Storing these activations also uses a substantial amount of storage space; 300 text samples, each with approximately 1000 tokens, with an embeddings size of 4096, at fp16 takes up ~3GB.
+
+Despite optimizations (e.g. threading writes/inference for faster inference, removing activations which are to be padded anyway to reduce stoarge requirements, overwriting the previous layer's activations rather than storing all layers' activations), these problems remain large obstacles for practicality.
 
 ## Advantages
 
 The primary advantage of PeLaTun is its ability to make the fine-tuning large language models (at least last layer finetuning) feasible on hardware with very limited resources. 
-Preprocessing the dataset as PeLaTun does also speeds up the final layer finetuning phase, as activations are only passed through the last layer, rather than all preceding layers.
-This results in faster iterations if doing multiple training runs after the initial dataset peristalsis.
+Preprocessing the dataset as PeLaTun does also speeds up the final layer finetuning phase, in case you need to do multiple training runs after the initial dataset peristalsis, as activations are only passed through the last layer, rather than all preceding layers.
