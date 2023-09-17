@@ -45,10 +45,6 @@ It seems infeasible to train the whole model persitalticly - we need all model w
 Even if we did that, it would also require storing the activations for all samples at all layers in order to calculate the gradients for them, which is just an infeasible amount of storage (multiple TB for a dataset of a few 100 samples).
 We could reduce the space used with gradient checkpointing https://github.com/cybertronai/gradient-checkpointing but it would still be very impractical, even slower, and still take up a lot of space.
 
-
-
-Despite optimizations (e.g. threading writes/inference for faster inference, removing activations which are to be padded anyway to reduce stoarge requirements, overwriting the previous layer's activations rather than storing all layers' activations), these problems remain large obstacles for practicality.
-
 ## Advantages
 
 The primary advantage of PeLaTun is its ability to make the fine-tuning large language models (at least last layer finetuning) feasible on hardware with very limited resources. 
