@@ -35,14 +35,14 @@ To maximise throughput, the batch sizes for inference through the embedding laye
 
 ### Fine-Tuning
 
-For the fine-tuning phase, you load the last transformer block(s) you wish to train, and initialize a Dataset of the activations from the previous layer, and another Dataset for the tokenized labels (be sure these two datasets' samples are matched correctly as they produce batches - I just do this using shuffle=False :p). The fine-tuning process then follows the standard language modelling procedure, but with activations serving as inputs rather than tokens.
+For the fine-tuning phase, you load the last transformer block(s) you wish to train, and initialize a Dataset of the activations from the previous layer, and another Dataset for the tokenized labels (be sure these two datasets' samples are matched correctly as they produce batches - I just do this using shuffle=False :p). The fine-tuning process then follows the standard language modelling procedure, but feeding _activations_ as inputs rather than tokens.
 
 ## Future Work
 
-PeLaTun could be extended to further reduce VRAM requirements by integrating QLoRa. The moonshot goal is to enable fine-tuning of the last few transformer blocks of a 70B language model with 8GB VRAM.
+PeLaTun could be extended to further reduce VRAM requirements by integrating QLoRa. The moonshot goal is to enable fine-tuning of the last few transformer blocks of a 70B language model with 8GB VRAM - compared to 7B, each 70B layer has double the hidden activation size, but 4-bit QLoRA should mean it fits in 8GB, and while 70B also has more layers, the number of layers doesn't make a difference to whether it fits in VRAM when using PeLaTun.
 
-It seems infeasible to train the whole model persitalticly - we need all model weights to be updated for each sample, we can't just train the last layer then train the previous layer. 
-It would also require storing the activation for all layers in order to calculate the gradients for them, which is just an infeasible amount of storage (multiple TB for a dataset of a few 100 samples).
+It seems infeasible to train the whole model persitalticly - we need all model weights to be updated for each training sample - we can't just train the last layer then train the previous layer. 
+Even if we did that, it would also require storing the activations for all samples at all layers in order to calculate the gradients for them, which is just an infeasible amount of storage (multiple TB for a dataset of a few 100 samples).
 We could reduce the space used with gradient checkpointing https://github.com/cybertronai/gradient-checkpointing but it would still be very impractical, even slower, and still take up a lot of space.
 
 
