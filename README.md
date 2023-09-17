@@ -31,7 +31,7 @@ I implements an appropriate pipeline to preprocess the dataset and finetune the 
 
 In this notebook only one transformer block is loaded at a time and batch size 1 is used for both inference and training to fit within the 8GB VRAM. 
 With more VRAM, it's possible to load multiple layers at once during inference and/or training and increase batch size for faster dataset preprocessing and/or training more layers.
-To maximise throughput, the batch sizes for inference through the embedding layer; through a transformer block; and for training should be independent. In this code, for simplicity, we set it to be the same for the first two.
+To maximise throughput, the batch sizes for inference through the embedding layer; inference through a transformer block; and for training should be independent. In this code, for simplicity, we set them all to 1. Since each batch inference becomes a single file, its just easier to use a batch size equal to how many samples are in a file for the whole pipeline.
 
 ### Fine-Tuning
 
