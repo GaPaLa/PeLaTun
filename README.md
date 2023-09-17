@@ -2,7 +2,7 @@
 
 ## Overview
 
-For very low resource fine tuning, you may consider last layer(s) finetuning, but you may not be able to even fit the entiremodel in VRAM, let alone for inference or training.
+For very low resource fine tuning, you may consider last layer(s) finetuning, but you may not be able to even fit the model in VRAM, let alone for inference or training.
 
 PeLaTun is a notebook designed for finetuning the last transformer block and unembedding layer of the Llama2-7B language model,
 with a context length of 4096 tokens and 16-bit precision, while using under 8GB VRAM.
