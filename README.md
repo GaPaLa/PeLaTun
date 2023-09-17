@@ -47,5 +47,5 @@ We could reduce the space used with gradient checkpointing https://github.com/cy
 
 ## Advantages
 
-The primary advantage of PeLaTun is its ability to make the fine-tuning large language models (at least last layer finetuning) feasible on hardware with very limited resources. 
-Preprocessing the dataset as PeLaTun does also speeds up the final layer finetuning phase, in case you need to do multiple training runs after the initial dataset peristalsis, as activations are only passed through the last layer, rather than all preceding layers.
+The primary advantage of PeLaTun is its ability to make the fine-tuning the last layer of large language models feasible on consumer hardware. 
+Preprocessing the dataset as PeLaTun does also speeds up the final layer finetuning phase, in case you do multiple training runs after the initial dataset peristalsis, as activations are only passed through the last layer, rather than all preceding layers.
