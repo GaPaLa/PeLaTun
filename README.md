@@ -1,51 +1,51 @@
-# Peristaltic Last Layer Tuning (PeLaTun) - Project README
+# "Peristaltic" Last Layer Tuning (PeLaTun?)
 
 ## Overview
 
-If you are memory-poor, you may consider last layer(s) finetuning,
-but you may not be able to even fit the entire model in VRAM, let alone for inference or training.
+For very low resource fine tuning, you may consider last layer(s) finetuning, but you may not be able to even fit the entiremodel in VRAM, let alone for inference or training.
 
-PeLaTun (Peristaltic Last Layer fineTuning) is a notebook designed for finetuning the last transformer block and unembedding layer of the Llama2-7B language model,
+PeLaTun is a notebook designed for finetuning the last transformer block and unembedding layer of the Llama2-7B language model,
 with a context length of 4096 tokens and 16-bit precision, while using under 8GB VRAM.
 
 
 This notebook notices that:
 
-1) to train the last few layers, you only need the preceeding activations and final labels to form your x,y training dataset - to avoid loading the whole model, you can just load the preceeding layers and do inference to get these preceding activations
-2) to minimize the VRAM requirement further, you can do this inference with just one layer at a time
-3) If you are only loading one layer at a time, it is much faster to load one layer at a time and pass the dataset through it and repeat that for the next layer,
-   than to pass a single batch through the entire model while loading one layer at a time, and repeating that for every batch - the first options uses far too much disk I/O
+1) to train the last few layers, you only need the preceeding activations to the layers you are going to train and the final labels in order to form your x,y training dataset - to avoid loading the whole model, you can just load the preceeding layers and do inference to get these preceding activations
+2) To minimize the VRAM requirement further, you can do this inference with just one layer at a time (it would be more efficient to do this in blocks of N layers, maximising N to how many you layers you can fit in VRAM with enough remaining for inference. I don't do this for simplicity.)
+3) It is much faster to load layer N, pass the entire dataset through it in batches, unload N, and repeat that for all next layers, than it is to load layer N, pass a single batch through it, unload N, then load layer N+1, pass the single batch through it, and repeat that for all batches in the dataset. The first options uses much less much disk I/O since weights are much larger than activations. I'll call this peristaltic inference, since the whole dataset goes through the model section by section.
 
-..and implements an appropriate training pipeline to preprocess the dataset and finetune the last layer in this fashion.
+I implements an appropriate pipeline to preprocess the dataset and finetune the last layer in this fashion.
 
 
-### Peristaltic Inference
+### Peristaltic Inference, step-by-step
 
-To further minimize VRAM requirements during the dataset preprocessing stage, we do "peristaltic inference", where we load one transformer layer at a time, processing the embedded dataset through it, and overwrite the embeddings with the output activations/hidden states.
-This process continues iteratively for each transformer block going up the model until the desired activations are obtained for training.
+1 - First, we take in the tokenized dataset, pass each batch through the embedding layer, then save those embeddings to disk.
 
-In this notebook, only one transformer block is loaded at a time, and batch size 1 is used for both inference and training to fit within the constraints of 8GB VRAM.
-With more VRAM, it's possible to load multiple layers at once and increase batch size for faster preprocessing and/or deeper training.
+2 - We initialize a single transformer block model with the correct params for Llama-2.
+
+3 - Next, we read the state_dict for Llama-2 7B and load the layers for the first transformer block. We overwrite the weights from the transformer block we initialized with these loaded weights.
+
+4 - One batch at a time, we pass the entire dataset through the transformer layer, saving activation to disk (I/O is very slow and it takes up tonsa LOT of disk space. We use threading to get saving/inference done as simultaneously as possible but inference is largely waiting on saving). To reduce the space the activation take up, we remove embeddings which correspond to padded tokens, and we only keep the activations for the currrent layer we are inferring with, so the sample_0 layer_5 activations file immediately overwrites sample_0 layer_4 file.
+
+5 - Once the entire dataset has been passed through this layer, move up a layer. Repeat the last two steps until we reach the layer just before the layers we want to train, so we have the correct input activations to feed them.
+
+In this notebook only one transformer block is loaded at a time and batch size 1 is used for both inference and training to fit within the 8GB VRAM. 
+With more VRAM, it's possible to load multiple layers at once during inference and/or training and increase batch size for faster dataset preprocessing and/or training more layers.
+To maximise throughput, the batch sizes for inference through the embedding layer; through a transformer block; and for training should be independent. In this code, for simplicity, we set it to be the same for the first two.
 
 ### Fine-Tuning
 
-For the fine-tuning phase, you load the last few transformer layer(s) you wish to train, along with the precomputed activations and labels. The last layers to be trained must be the ones directly after the pre-computed activations from earlier inference.
-The fine-tuning process then follows the standard language modelling procedure, but with activations serving as inputs rather than tokens.
+For the fine-tuning phase, you load the last transformer block(s) you wish to train, and initialize a Dataset of the activations from the previous layer, and another Dataset for the tokenized labels (be sure these two datasets' samples are matched correctly as they produce batches - I just do this using shuffle=False :p). The fine-tuning process then follows the standard language modelling procedure, but with activations serving as inputs rather than tokens.
 
 ## Future Work
 
 PeLaTun could be extended to further reduce VRAM requirements by integrating QLoRa. The moonshot goal is to enable fine-tuning of the last few transformer blocks of a 70B language model with 8GB VRAM.
 
-Finding a way to extend this to finetuning the whole model by taking inspiration from gradient checkpointing seems possible, but that would take up even more disk space (for gradients) and require each layer to be both trained and to have inference re-run on that layer to get the relevant gradients.
-Since this is just a fun project to test an idea, this is left out.
+It seems infeasible to train the whole model persitalticly - we need all model weights to be updated for each sample, we can't just train the last layer then train the previous layer. 
+It would also require storing the activation for all layers in order to calculate the gradients for them, which is just an infeasible amount of storage (multiple TB for a dataset of a few 100 samples).
+We could reduce the space used with gradient checkpointing https://github.com/cybertronai/gradient-checkpointing but it would still be very impractical, even slower, and still take up a lot of space.
 
-## Issues
 
-The primary challenge of PeLaTun is related to I/O bandwidth and storage space. Peristaltic inference involves continuously (over)writing hidden states to disk.
-Writing activations to disk is significantly slower than passing it through a transformer block, resulting in waiting times for write operations to complete before starting the next batch (otherwise, you risk a vuffer overflow of cached activations).
-As a result, dataset peristalsis is a very time-consuming process.
-
-Storing these activations also uses a substantial amount of storage space; 300 text samples, each with approximately 1000 tokens, with an embeddings size of 4096, at fp16 takes up ~3GB.
 
 Despite optimizations (e.g. threading writes/inference for faster inference, removing activations which are to be padded anyway to reduce stoarge requirements, overwriting the previous layer's activations rather than storing all layers' activations), these problems remain large obstacles for practicality.
 
