@@ -1,6 +1,6 @@
 # "Peristaltic" Last Layer Tuning (PeLaTun?)
 
-# NOTE! the target here is 8GB and we reach this as observed in Colab on a T4 GPU, but on an actual 8GB VRAM GPU is runs OOM if you use Adam. It fits with SGD but this is obviously not ideal! Needs more work.
+NOTE! the target here is 8GB and we reach this as observed in Colab on a T4 GPU, but on an actual 8GB VRAM GPU is runs OOM if you use Adam. It fits with SGD but this is obviously not ideal! Needs more work.
 
 ## Overview
 
